@@ -1,13 +1,13 @@
-1. Add containerized_buildah profile to apparmor
+1. Add containerized_buildah profile to apparmor    
    copy containerized_buildah file to /etc/apparmor.d/containerized_buildah
-2. Restart apparmour
+2. Restart apparmour       
    `$ service apparmour restart`
-3. Install fuse device plugin
+3. Install fuse device plugin    
    `$ kubectl apply -f fuse-device-plugin.yaml`
-4. Get deployment name from gitlab runner helm chart (Cmd must be run in same folder as kustomize.yaml)
+4. Get deployment name from gitlab runner helm chart (Cmd must be run in same folder as kustomize.yaml)    
    `$ kubectl kustomize . --enable-helm | less`
-5. Place deployment name from step 4 into Line 22 in kustomization.yaml
-6. Preview and create runner registration token secret
+5. Place deployment name from step 4 into Line 22 in kustomization.yaml    
+6. Preview and create runner registration token secret    
    ```
    # Preview
    $ kubectl -n <-insert-namespace-here-> create secret generic <-insert-secret-name-here-> \
