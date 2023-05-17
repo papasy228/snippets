@@ -1,0 +1,30 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- limit-range-policy.yaml
+# created using kubeseal and sealed secrets
+#- gitlab-runner-secret-sealed.yaml
+
+helmCharts:
+- name: gitlab-runner
+  version: 0.52.0
+  repo: https://charts.gitlab.io
+  releaseName: <insert-release-name>
+  valuesFile: values.yaml
+  namespace: gitlab-runner
+  includeCRDs: true
+
+patches:
+- target:
+    kind: Deployment
+    name: <insert-deployment-name>
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/command
+      value:
+        - /bin/bash
+        - /configmaps/entrypoint
+
+namespace: gitlab-runner

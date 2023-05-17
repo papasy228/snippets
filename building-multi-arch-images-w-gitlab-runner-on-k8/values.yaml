@@ -1,0 +1,38 @@
+image:
+  registry: registry.gitlab.com
+  image: gitlab-org/ci-cd/gitlab-runner-ubi-images/gitlab-runner-ocp
+  tag: v15.9.1
+
+gitlabUrl: https://gitlab.com/
+
+rbac:
+  create: true
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 999
+
+runners:
+  secret: <-insert-runner-registration-token-secret-here->
+  locked: false
+  tags: <-insert-tag1->,<-insert-tag2->,<insert-tag3>,<insert-tag4>
+  name: <-insert-runner-name-here->
+  config: |
+    [[runners]]
+      executor = "kubernetes"
+      [runners.kubernetes]
+        namespace = "gitlab-runner"
+        helper_image = "registry.gitlab.com/gitlab-org/ci-cd/gitlab-runner-ubi-images/gitlab-runner-helper-ocp:x86_64-v15.9.1"
+        [runners.kubernetes.pod_annotations]
+          "container.apparmor.security.beta.kubernetes.io/build" = "localhost/containerized_buildah"
+        [runners.kubernetes.build_container_security_context]
+          run_as_non_root = true
+          run_as_user = 1000
+          run_as_group = 1000
+resources:
+  limits:
+    memory: 1Gi
+    cpu: 250m
+  requests:
+    memory: 1Gi
+    cpu: 250m
