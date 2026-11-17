@@ -1,0 +1,83 @@
+# L3/L4 confinement for the sandbox.
+#
+# Select the label that actually exists. The agent-sandbox controller labels
+# the sandbox pod with `agents.x-k8s.io/sandbox-name-hash`; it does NOT carry
+# `openshell.ai/managed-by`, which is only on the Sandbox object. A policy
+# that selects a label no pod has matches zero endpoints, and Cilium reports
+# `policy realization: None` — it fails open.
+#
+# Under the supervisor's L7 policy the sandbox needs only DNS and the gateway.
+# Inference does not go to the model host from here: Hermes calls
+# https://inference.local/v1 and the gateway dials the provider.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: agent-tenant-a-sandbox-egress
+spec:
+  endpointSelector:
+    matchExpressions:
+      - key: agents.x-k8s.io/sandbox-name-hash
+        operator: Exists
+  enableDefaultDeny:
+    egress: true
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: agent-tenant-a
+            k8s:app.kubernetes.io/name: openshell
+            k8s:app.kubernetes.io/instance: agent-tenant-a
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+---
+# The gateway is the component that talks to the outside world: the API
+# server (it creates and watches Sandbox objects, and serves relay clients),
+# the control plane on 6443 for OIDC discovery + JWKS, and the model host.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: agent-tenant-a-gateway-egress
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: openshell
+      app.kubernetes.io/instance: agent-tenant-a
+  enableDefaultDeny:
+    egress: true
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+    - toEntities:
+        - cluster
+        - kube-apiserver
+    # OIDC discovery is fetched anonymously from the advertised issuer, and
+    # `toEntities: kube-apiserver` does not cover the VIP or the JWKS host:
+    # allow them by address.
+    - toCIDR:
+        - <api-endpoint>/32
+        - <control-plane-range>
+      toPorts:
+        - ports:
+            - port: "6443"
+              protocol: TCP
+    - toCIDR:
+        - <model-endpoint>/32
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

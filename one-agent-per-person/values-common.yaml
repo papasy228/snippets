@@ -1,0 +1,57 @@
+# Shared agent defaults for every tenant.
+#
+# Loaded after the chart's own values-kubernetes.yaml and before the tenant's
+# values.yaml, so this file holds only what every agent has in common.
+agent:
+  model:
+    providerType: openai
+    name: <model-name>                  # whatever /v1/models returns
+    baseUrl: https://model.example/v1
+    api: openai-completions
+    contextWindow: 168960
+    requestTimeoutSeconds: 3600
+    # The bootstrap hook POSTs to the endpoint before it creates the sandbox.
+    # Leave this off until the gateway pod can actually reach the model host.
+    verifyEndpoint: false
+    apiKeySecretRef:
+      name: model-api-key
+      key: api-key
+  sandbox:
+    cpu: "2"
+    memory: 8Gi
+  # NemoClaw's drain gate wants a root-owned /sandbox/.nemoclaw. The chart's
+  # prepare hook relabels it, which fails on SELinux-enforcing nodes (NFS is
+  # ENOTSUP, XFS is EINVAL). Off here: the API may report "draining", but the
+  # dashboard and API keep working.
+  nemoclawHome:
+    enabled: false
+    storageClass: ""
+
+persistence:
+  storageClass: <rwx-storage-class>    # workspace: ReadWriteMany
+  size: 5Gi
+
+gatewayPersistence:
+  # The gateway keeps its SQLite database here. OpenShell requires a NON-NFS
+  # volume, so this overrides the class above with the cluster's local
+  # provisioner (RWO, WaitForFirstConsumer).
+  storageClass: <rwo-storage-class>
+
+platform:
+  serviceAccountIssuerDiscovery:
+    # Cluster-scoped: ONLY ONE release may set createPublicBinding. Keep it
+    # here, not in a tenant file, or the second tenant will collide.
+    createPublicBinding: true
+    preexistingAnonymousAccess: false
+    dangerousAcknowledgement: I_ACKNOWLEDGE_PUBLIC_OIDC_DISCOVERY
+
+operatorClient:
+  # The attach-only terminal cannot start on Kubernetes 1.37 / containerd 2.3:
+  # the chart mounts a config file as a subPath inside the read-only /tools
+  # volume, and runc refuses to create the mountpoint. Dashboard + API only.
+  enabled: false
+
+access:
+  enabled: true
+  exposure:
+    type: none                         # tenant sets `ingress` to get the edge

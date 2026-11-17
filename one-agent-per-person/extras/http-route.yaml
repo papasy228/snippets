@@ -1,0 +1,31 @@
+# Public entry point for the dashboard.
+#
+# The backend is the chart's access Service on 8080 — the nginx edge. Do NOT
+# point this at the relay's own port: Hermes only accepts loopback Host and
+# Origin values, and the edge is what rewrites them.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: agent-tenant-a
+spec:
+  parentRefs:
+    # group/kind spelled out: the API server defaults them and Argo treats
+    # the defaulted fields as drift (perpetual OutOfSync).
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: <gateway-name>
+      namespace: <gateway-namespace>
+      sectionName: <listener-name>
+  hostnames:
+    - agent-a.example.com
+  rules:
+    # Forward-auth at rule level, never under backendRefs[].filters.
+    - filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: auth
+      backendRefs:
+        - name: agent-tenant-a-kubernetes-deployer-access
+          port: 8080

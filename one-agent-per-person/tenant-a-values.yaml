@@ -1,0 +1,35 @@
+# One tenant = one agent. Everything that makes this agent *this* agent.
+openshell:
+  server:
+    oidc:
+      # Must equal the issuer the API server advertises, byte for byte:
+      #   kubectl get --raw /.well-known/openid-configuration \
+      #     | jq -r .issuer
+      # On clusters that publish a floating VIP this is the VIP, not
+      # https://kubernetes.default.svc.
+      issuer: https://api.example.com:6443
+
+agent:
+  model:
+    baseUrl: https://model.example/v1
+    name: <model-name>
+
+access:
+  dashboard:
+    externalUrl: https://agent-a.example.com
+  exposure:
+    # `ingress` is not used to publish an Ingress: it makes the chart add the
+    # nginx edge container, which enforces same-origin requests and rewrites
+    # Host/Origin to loopback. The Gateway API route points at that edge.
+    type: ingress
+    dashboardUnauthenticatedAcknowledgement: I_ACKNOWLEDGE_UNAUTHENTICATED_DASHBOARD
+    ingress:
+      dashboard:
+        host: agent-a.example.com
+      api:
+        host: agent-a-api.example.com
+      annotations:
+        # No ingress controller watches this object here, so it never gets a
+        # status.loadBalancer. Without this, Argo reports Progressing forever
+        # and the PostSync bootstrap Job never runs.
+        argocd.argoproj.io/ignore-healthcheck: "true"
