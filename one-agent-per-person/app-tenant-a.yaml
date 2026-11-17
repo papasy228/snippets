@@ -1,0 +1,49 @@
+# The child Application the cluster actually gets.
+#
+# Reference from the per-cluster overlay (appset-config.yaml template) or
+# apply it directly; either way it has to land in the argocd namespace.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: agent-tenant-a
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    name: prod-cluster                  # a registered Argo cluster
+    namespace: agent-tenant-a
+  sources:
+    # 1) The upstream chart.
+    - repoURL: https://github.com/NVIDIA/nemoclaw-community.git
+      targetRevision: main
+      path: examples/tools/kubernetes-deployer
+      helm:
+        releaseName: agent-tenant-a
+        valueFiles:
+          - values-kubernetes.yaml      # file inside the chart
+          - $values/agent-runtime/overlays/base/values-common.yaml
+          - $values/agent-runtime/overlays/tenant-a/values.yaml
+
+    # 2) This GitOps repository, referenced as $values.
+    - repoURL: https://gitlab.com/<group>/<gitops-repo>.git
+      targetRevision: main
+      ref: values
+
+    # 3) Per-tenant extras, rendered with kustomize.
+    - repoURL: https://gitlab.com/<group>/<gitops-repo>.git
+      targetRevision: main
+      path: agent-runtime/overlays/tenant-a/extras
+
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+    managedNamespaceMetadata:
+      # The combined supervisor needs privileged admission. The chart will
+      # not create or relabel the namespace for you.
+      labels:
+        pod-security.kubernetes.io/enforce: privileged
+        pod-security.kubernetes.io/audit: privileged
+        pod-security.kubernetes.io/warn: privileged

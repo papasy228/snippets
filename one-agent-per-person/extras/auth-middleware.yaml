@@ -1,0 +1,21 @@
+# Namespace-local copy of the forward-auth Middleware.
+#
+# Gateway API ExtensionRef filters have no `namespace` field: Traefik resolves
+# them as <route-namespace>-<name>, so a filter pointing at a Middleware in
+# another namespace produces "middleware ... does not exist" and the router is
+# dropped (404). Keep this copy in the tenant namespace and in sync with the
+# shared one.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: auth
+spec:
+  forwardAuth:
+    address: http://auth.<auth-namespace>.svc.cluster.local:3000/api/auth/traefik
+    authResponseHeaders:
+      - remote-user
+      - remote-name
+      - remote-email
+      - remote-groups
+      - remote-sub
+      - authorization
